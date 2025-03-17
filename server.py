@@ -1,36 +1,48 @@
+import os
 import pandas as pd
-from fastapi import FastAPI, UploadFile, HTTPException
-from fastapi.responses import FileResponse
-
+from flask import Flask, request, send_file, jsonify
 from classify import classify
 
-app = FastAPI()
+app = Flask(__name__)
 
-@app.post("/classify/")
-async def classify_logs(file: UploadFile):
-    if not file.filename.endswith('.csv'):
-        raise HTTPException(status_code=400, detail="File must be a CSV.")
+UPLOAD_FOLDER = "resources"
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)  
+
+@app.route("/classify/", methods=["POST"])
+def classify_logs():
+    print("Ready")
     
-    try:
-        # Read the uploaded CSV
-        df = pd.read_csv(file.file)
-        if "source" not in df.columns or "log_message" not in df.columns:
-            raise HTTPException(status_code=400, detail="CSV must contain 'source' and 'log_message' columns.")
+    if "file" not in request.files:
+        return jsonify({"error": "No file part"}), 400
 
-        # Perform classification
+    file = request.files["file"]
+
+    if file.filename == "":
+        return jsonify({"error": "No selected file"}), 400
+
+    if not file.filename.endswith(".csv"):
+        return jsonify({"error": "File must be a CSV"}), 400
+
+    try:
+        
+        df = pd.read_csv(file)
+        if "source" not in df.columns or "log_message" not in df.columns:
+            return jsonify({"error": "CSV must contain 'source' and 'log_message' columns"}), 400
+
+        
         df["target_label"] = classify(list(zip(df["source"], df["log_message"])))
 
-        print("Dataframe:",df.to_dict())
+        print("Dataframe:", df.to_dict())
 
         # Save the modified file
-        output_file = "resources/output.csv"
+        output_file = os.path.join(UPLOAD_FOLDER, "output.csv")
         df.to_csv(output_file, index=False)
         print("File saved to output.csv")
-        return FileResponse(output_file, media_type='text/csv')
+
+        return send_file(output_file, mimetype="text/csv", as_attachment=True)
+    
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        file.file.close()
-        # # Clean up if the file was saved
-        # if os.path.exists("output.csv"):
-        #     os.remove("output.csv")
+        return jsonify({"error": str(e)}), 500
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=True)

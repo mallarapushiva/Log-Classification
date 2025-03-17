@@ -36,7 +36,7 @@ This project implements a hybrid log classification system, combining three comp
    - This folder contains resource files such as test CSV files, output files, images, etc.
 
 4. **Root Directory**:
-   - Contains the FastAPI server code (`server.py`).
+   - Contains the FlaskAPI server code (`server.py`).
 
 ---
 
